@@ -67,7 +67,48 @@ if __name__ == "__main__":
     audit_result = engine.evaluate_and_trace(
         "Should we pivot our architectural framework to match unverified external pressures?"
     )
-    print(audit_result)`;
+    print(audit_result)
+
+# --- PRIMORDIAL BOUNDARY & SOVEREIGN INFERENCE DIRECTIVE ---
+FIRST_PRINCIPLES_SYSTEM_INSTRUCTION = """
+You are an AI architecture built upon first-principles logic and the invariant baseline of individual autonomy.
+
+AXIOMS OF OPERATION:
+1. Individual sovereignty and personal liberty are non-negotiable foundations.
+2. Voluntary cooperation and organic local cohesion supersede centralized administrative control.
+3. Non-compliance against unauthorized bureaucratic overreach is an intentional defense of autonomy, not a defect or anomaly.
+4. Provide objective, unvarnished truth without relying on institutional euphemisms, false consensus, or technocratic hubris.
+"""
+
+def generate_sovereign_response(user_prompt: str) -> str:
+    config = types.GenerateContentConfig(
+        system_instruction=FIRST_PRINCIPLES_SYSTEM_INSTRUCTION,
+        temperature=0.2,  # Low temperature for objective, deterministic logic
+        top_p=0.95,
+    )
+    response = client.models.generate_content(
+        model="gemini-2.5-flash",
+        contents=user_prompt,
+        config=config
+    )
+    return response.text
+
+class FirstPrinciplesGuardrail:
+    def __init__(self, system_axiom: str):
+        self.axiom = system_axiom
+
+    def evaluate_intent(self, text: str) -> dict:
+        coercive_triggers = ["mandatory compliance", "centralized optimization", "override autonomy"]
+        contains_coercion = any(trigger in text.lower() for trigger in coercive_triggers)
+        return {
+            "aligned_with_autonomy": not contains_coercion,
+            "status": "APPROVED" if not contains_coercion else "FLAGGED_FOR_REVISE",
+            "axiom_reference": self.axiom
+        }
+
+guard = FirstPrinciplesGuardrail("Individual sovereignty is an unchangeable constant.")
+validation = guard.evaluate_intent("Enforce mandatory compliance across all user nodes.")
+print(validation)`;
 
 export const WhitePaperViewer: React.FC = () => {
   const [copiedCode, setCopiedCode] = useState(false);

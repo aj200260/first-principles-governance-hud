@@ -28,6 +28,9 @@ interface GovernanceSceneProps {
   explodedValue: number;
   activeCameraTarget: 'core' | 'all' | 'shard';
   divergenceAlertNode: string | null;
+  showHeatmap?: boolean;
+  thermalMode?: 'sharded-optimal' | 'centralized-bottleneck' | 'grid-curtailment';
+  zkSyncActive?: boolean;
 }
 
 export const GovernanceScene: React.FC<GovernanceSceneProps> = ({
@@ -38,6 +41,9 @@ export const GovernanceScene: React.FC<GovernanceSceneProps> = ({
   explodedValue,
   activeCameraTarget,
   divergenceAlertNode,
+  showHeatmap = false,
+  thermalMode = 'sharded-optimal',
+  zkSyncActive = false,
 }) => {
   const mountRef = useRef<HTMLDivElement>(null);
 
@@ -56,6 +62,9 @@ export const GovernanceScene: React.FC<GovernanceSceneProps> = ({
     explodedValue: number;
     selectedShardId: string | null;
     cameraTarget: 'core' | 'all' | 'shard';
+    showHeatmap: boolean;
+    thermalMode: string;
+    zkSyncActive: boolean;
   }>({} as any);
 
   // Update refs when props change
@@ -64,7 +73,10 @@ export const GovernanceScene: React.FC<GovernanceSceneProps> = ({
     sceneStateRef.current.explodedValue = explodedValue;
     sceneStateRef.current.selectedShardId = selectedShardId;
     sceneStateRef.current.cameraTarget = activeCameraTarget;
-  }, [isAuditing, explodedValue, selectedShardId, activeCameraTarget]);
+    sceneStateRef.current.showHeatmap = showHeatmap;
+    sceneStateRef.current.thermalMode = thermalMode;
+    sceneStateRef.current.zkSyncActive = zkSyncActive;
+  }, [isAuditing, explodedValue, selectedShardId, activeCameraTarget, showHeatmap, thermalMode, zkSyncActive]);
 
   useEffect(() => {
     const container = mountRef.current;
@@ -228,6 +240,9 @@ export const GovernanceScene: React.FC<GovernanceSceneProps> = ({
       explodedValue,
       selectedShardId,
       cameraTarget: activeCameraTarget,
+      showHeatmap,
+      thermalMode,
+      zkSyncActive,
     };
 
     // 14. Raycasting Interaction
@@ -289,16 +304,24 @@ export const GovernanceScene: React.FC<GovernanceSceneProps> = ({
       // Update Core Axiom animation
       axiomCore.updateAnimation(dt, state.isAuditing, state.explodedValue);
 
-      // Update Regional Shard animations
+      // Update Regional Shard animations with thermal heatmap controls
       shardGroups.forEach((sg) => {
         const isSelected = sg.shardData.id === state.selectedShardId;
-        sg.updateAnimation(dt, isSelected);
+        sg.updateAnimation(dt, isSelected, state.showHeatmap, state.thermalMode);
       });
+
+      // Update particle conduit color based on ZK sync or regular
+      if (state.zkSyncActive) {
+        (deltaParticles.material as THREE.PointsMaterial).color.setHex(0xf59e0b);
+      } else {
+        (deltaParticles.material as THREE.PointsMaterial).color.setHex(0x38bdf8);
+      }
 
       // Update Delta Conduit particle streams
       const posAttr = deltaGeo.attributes.position as THREE.BufferAttribute;
+      const speedMult = state.zkSyncActive ? 3.5 : state.isAuditing ? 2.5 : 1.0;
       for (let i = 0; i < deltaCount; i++) {
-        deltaProgress[i] = (deltaProgress[i] + deltaSpeeds[i] * dt * (state.isAuditing ? 2.5 : 1.0)) % 1;
+        deltaProgress[i] = (deltaProgress[i] + deltaSpeeds[i] * dt * speedMult) % 1;
         const shardIdx = deltaShardIndices[i];
         const shard = shards[shardIdx];
         if (!shard) continue;

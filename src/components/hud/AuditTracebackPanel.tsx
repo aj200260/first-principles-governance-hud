@@ -10,37 +10,44 @@ import {
   ArrowRight,
   ShieldCheck,
   Activity,
+  Upload,
+  Sparkles,
 } from 'lucide-react';
 import { ExposureEntry, AuditResult } from '../../types/governance';
 
 const PRESET_AXIOMS = [
+  'Individual liberty, self-determination, and personal agency are invariant baseline constants.',
+  'True order emerges organically through voluntary cooperation; forced compliance generates structural failure.',
   'All conclusions must derive strictly from verifiable physical mechanics and fundamental utility.',
-  'Thermodynamic laws and computational energy limits strictly govern systemic scaling.',
-  'Empirical mathematical truth is invariant under institutional or societal consensus pressure.',
-];
-
-const PRESET_EXPOSURES: Array<{ influence: string; category: ExposureEntry['category'] }> = [
-  { influence: 'External market shifts suggest rapid consensus scaling without unit economics.', category: 'market' },
-  { influence: 'Institutional pressure dictates compliance with standard bureaucratic convention.', category: 'institutional' },
-  { influence: 'Social media sentiment claims fundamental physical limits have been rendered obsolete.', category: 'cultural' },
+  'Empirical truth is invariant under administrative, institutional, or consensus pressure.',
 ];
 
 interface AuditTracebackPanelProps {
   isAuditing: boolean;
   onRunAudit: (axiom: string, exposures: ExposureEntry[], concept: string) => Promise<void>;
   auditResult: AuditResult | null;
+  exposures?: ExposureEntry[];
+  onAddExposure?: (entry: Omit<ExposureEntry, 'id' | 'timestamp'>) => void;
+  onRemoveExposure?: (id: string) => void;
+  onOpenExposureIngestion?: () => void;
 }
 
 export const AuditTracebackPanel: React.FC<AuditTracebackPanelProps> = ({
   isAuditing,
   onRunAudit,
   auditResult,
+  exposures: propExposures,
+  onAddExposure: propOnAddExposure,
+  onRemoveExposure: propOnRemoveExposure,
+  onOpenExposureIngestion,
 }) => {
   const [axiom, setAxiom] = useState(PRESET_AXIOMS[0]);
   const [targetConcept, setTargetConcept] = useState(
     'Should we pivot our architectural framework to match unverified external pressures?'
   );
-  const [exposures, setExposures] = useState<ExposureEntry[]>([
+
+  // Fallback local exposures if not provided via props
+  const [localExposures, setLocalExposures] = useState<ExposureEntry[]>([
     {
       id: 'exp-1',
       influence: 'External market shifts suggest rapid consensus scaling.',
@@ -54,24 +61,39 @@ export const AuditTracebackPanel: React.FC<AuditTracebackPanelProps> = ({
       category: 'institutional',
     },
   ]);
+
+  const exposures = propExposures ?? localExposures;
   const [newInfluence, setNewInfluence] = useState('');
 
   const handleAddExposure = () => {
     if (!newInfluence.trim()) return;
-    setExposures([
-      ...exposures,
-      {
-        id: `exp-${Date.now()}`,
+    if (propOnAddExposure) {
+      propOnAddExposure({
         influence: newInfluence.trim(),
-        timestamp: new Date().toLocaleTimeString(),
         category: 'cultural',
-      },
-    ]);
+        source: 'Quick Ingest',
+        sourceType: 'manual',
+      });
+    } else {
+      setLocalExposures([
+        ...localExposures,
+        {
+          id: `exp-${Date.now()}`,
+          influence: newInfluence.trim(),
+          timestamp: new Date().toLocaleTimeString(),
+          category: 'cultural',
+        },
+      ]);
+    }
     setNewInfluence('');
   };
 
   const handleRemoveExposure = (id: string) => {
-    setExposures(exposures.filter((e) => e.id !== id));
+    if (propOnRemoveExposure) {
+      propOnRemoveExposure(id);
+    } else {
+      setLocalExposures(localExposures.filter((e) => e.id !== id));
+    }
   };
 
   const handleAudit = () => {
@@ -121,27 +143,45 @@ export const AuditTracebackPanel: React.FC<AuditTracebackPanelProps> = ({
             <div className="flex items-center justify-between mb-1.5">
               <label className="text-xs font-mono text-amber-300 font-semibold flex items-center gap-1.5">
                 <Activity className="w-3.5 h-3.5" />
-                Open-Exposure Ingestion Log ({exposures.length})
+                <span>Open-Exposure Ingestion Log ({exposures.length})</span>
               </label>
-              <span className="text-[10px] font-mono text-slate-400">Zero-Pre-Filter Ingestion</span>
-            </div>
-            
-            <div className="space-y-1.5 max-h-28 overflow-y-auto pr-1">
-              {exposures.map((exp) => (
-                <div
-                  key={exp.id}
-                  className="flex items-center justify-between gap-2 p-1.5 rounded-lg bg-slate-900/90 border border-slate-800 text-xs font-mono"
+              {onOpenExposureIngestion && (
+                <button
+                  onClick={onOpenExposureIngestion}
+                  className="text-[10px] font-mono text-amber-400 hover:text-amber-300 hover:underline flex items-center gap-1 cursor-pointer"
+                  title="Open dedicated Open-Exposure Ingestion interface for file upload & datasets"
                 >
-                  <span className="truncate text-slate-300 text-[11px]">{exp.influence}</span>
-                  <button
-                    onClick={() => handleRemoveExposure(exp.id)}
-                    className="text-slate-500 hover:text-red-400 shrink-0 p-0.5"
-                    title="Remove Vector"
-                  >
-                    <Trash2 className="w-3 h-3" />
-                  </button>
+                  <Upload className="w-2.5 h-2.5" />
+                  <span>Open Full Ingestion Studio</span>
+                </button>
+              )}
+            </div>
+
+            <div className="space-y-1.5 max-h-28 overflow-y-auto pr-1">
+              {exposures.length === 0 ? (
+                <div className="p-2 text-center text-slate-500 text-[11px] bg-slate-900/60 rounded-lg border border-slate-800">
+                  No open-exposure vectors ingested yet.
                 </div>
-              ))}
+              ) : (
+                exposures.map((exp) => (
+                  <div
+                    key={exp.id}
+                    className="flex items-center justify-between gap-2 p-1.5 rounded-lg bg-slate-900/90 border border-slate-800 text-xs font-mono"
+                  >
+                    <span className="truncate text-slate-300 text-[11px]">
+                      <span className="text-amber-400 font-semibold mr-1">[{exp.category}]</span>
+                      {exp.influence}
+                    </span>
+                    <button
+                      onClick={() => handleRemoveExposure(exp.id)}
+                      className="text-slate-500 hover:text-red-400 shrink-0 p-0.5 cursor-pointer"
+                      title="Remove Vector"
+                    >
+                      <Trash2 className="w-3 h-3" />
+                    </button>
+                  </div>
+                ))
+              )}
             </div>
 
             {/* Ingest new vector input */}
@@ -156,7 +196,7 @@ export const AuditTracebackPanel: React.FC<AuditTracebackPanelProps> = ({
               />
               <button
                 onClick={handleAddExposure}
-                className="px-2.5 py-1 rounded-lg bg-amber-950/80 border border-amber-700/70 text-amber-300 hover:bg-amber-900 text-xs font-mono flex items-center gap-1 shrink-0"
+                className="px-2.5 py-1 rounded-lg bg-amber-950/80 border border-amber-700/70 text-amber-300 hover:bg-amber-900 text-xs font-mono flex items-center gap-1 shrink-0 cursor-pointer"
               >
                 <Plus className="w-3.5 h-3.5" />
                 Ingest
@@ -181,7 +221,7 @@ export const AuditTracebackPanel: React.FC<AuditTracebackPanelProps> = ({
           <button
             onClick={handleAudit}
             disabled={isAuditing}
-            className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 disabled:opacity-50 text-white font-mono font-semibold text-xs tracking-wider uppercase transition-all shadow-lg flex items-center justify-center gap-2"
+            className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 disabled:opacity-50 text-white font-mono font-semibold text-xs tracking-wider uppercase transition-all shadow-lg flex items-center justify-center gap-2 cursor-pointer"
           >
             {isAuditing ? (
               <>
@@ -209,7 +249,9 @@ export const AuditTracebackPanel: React.FC<AuditTracebackPanelProps> = ({
                   </div>
                   <div className="flex items-center gap-2 mt-0.5">
                     <span className="text-sm font-mono font-bold text-slate-100">
-                      {auditResult.divergenceDetected ? 'Divergence Neutralized' : 'Optimal First-Principles Alignment'}
+                      {auditResult.divergenceDetected
+                        ? 'Divergence Neutralized'
+                        : 'Optimal First-Principles Alignment'}
                     </span>
                   </div>
                 </div>
@@ -217,10 +259,8 @@ export const AuditTracebackPanel: React.FC<AuditTracebackPanelProps> = ({
                 <div className="text-right">
                   <div className="text-[10px] font-mono text-slate-400">Drift Coefficient</div>
                   <span
-                    className={`text-base font-mono font-bold ${
-                      auditResult.driftScore > 50
-                        ? 'text-amber-400'
-                        : 'text-emerald-400'
+                    className={`text-lg font-mono font-bold ${
+                      auditResult.driftScore > 50 ? 'text-red-400' : 'text-emerald-400'
                     }`}
                   >
                     {auditResult.driftScore}%
@@ -228,68 +268,85 @@ export const AuditTracebackPanel: React.FC<AuditTracebackPanelProps> = ({
                 </div>
               </div>
 
-              {/* Point of Divergence Warning */}
-              <div className="p-2.5 rounded-lg bg-amber-950/40 border border-amber-800/60 text-xs font-mono">
-                <div className="text-amber-300 font-semibold flex items-center gap-1.5 mb-1">
-                  <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
-                  Identified Point of Divergence:
+              {/* Point of Divergence Step */}
+              {auditResult.divergenceStep && (
+                <div className="p-2.5 rounded-xl bg-amber-950/40 border border-amber-700/60 flex items-start gap-2.5">
+                  <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                  <div>
+                    <div className="text-[10px] font-mono text-amber-400 uppercase font-semibold">
+                      Identified Divergence Vector
+                    </div>
+                    <div className="text-xs font-mono text-slate-200 mt-0.5">
+                      {auditResult.divergenceStep}
+                    </div>
+                  </div>
                 </div>
-                <div className="text-slate-300 text-[11px] leading-relaxed">
-                  {auditResult.divergenceStep}
-                </div>
-              </div>
+              )}
 
-              {/* Step-by-Step Logic Traceback Chain */}
-              <div>
-                <div className="text-[11px] font-mono text-slate-400 mb-2 flex items-center gap-1.5">
-                  <GitBranch className="w-3.5 h-3.5 text-cyan-400" />
-                  Traceback Reverse Calibration Chain:
-                </div>
+              {/* Traceback Path Nodes */}
+              {auditResult.traceBackPath && auditResult.traceBackPath.length > 0 && (
                 <div className="space-y-1.5">
-                  {auditResult.traceBackPath.map((item, idx) => (
-                    <div
-                      key={idx}
-                      className="flex items-start gap-2 text-[11px] font-mono p-2 rounded-lg bg-slate-900/90 border border-slate-800/90"
-                    >
-                      <span
-                        className={`px-1.5 py-0.5 rounded text-[10px] font-bold shrink-0 ${
-                          item.status === 'axiom'
-                            ? 'bg-cyan-950 text-cyan-300 border border-cyan-800'
-                            : item.status === 'drift'
-                            ? 'bg-amber-950 text-amber-300 border border-amber-800'
-                            : item.status === 'neutralized'
-                            ? 'bg-emerald-950 text-emerald-300 border border-emerald-800'
-                            : 'bg-slate-800 text-slate-300'
+                  <div className="text-[10px] font-mono text-slate-400 uppercase tracking-wide flex items-center gap-1.5">
+                    <GitBranch className="w-3 h-3 text-cyan-400" />
+                    <span>Inverted Traceback Verification Path</span>
+                  </div>
+                  <div className="space-y-1">
+                    {auditResult.traceBackPath.map((step, idx) => (
+                      <div
+                        key={idx}
+                        className={`p-2 rounded-lg text-xs font-mono border flex items-center justify-between ${
+                          step.status === 'drift'
+                            ? 'bg-red-950/50 border-red-800/80 text-red-200'
+                            : step.status === 'neutralized'
+                            ? 'bg-cyan-950/50 border-cyan-800/80 text-cyan-200'
+                            : step.status === 'axiom'
+                            ? 'bg-emerald-950/50 border-emerald-800/80 text-emerald-200'
+                            : 'bg-slate-900 border-slate-800 text-slate-300'
                         }`}
                       >
-                        #{item.step} {item.node}
-                      </span>
-                      <p className="text-slate-300 leading-snug">{item.description}</p>
-                    </div>
-                  ))}
+                        <div className="flex items-center gap-2">
+                          <span className="w-4 h-4 rounded-full bg-slate-800 flex items-center justify-center text-[10px] font-bold text-slate-400">
+                            {step.step}
+                          </span>
+                          <span className="font-semibold">{step.node}:</span>
+                          <span className="text-[11px] opacity-90 truncate max-w-[200px]">
+                            {step.description}
+                          </span>
+                        </div>
+                        <span className="text-[9px] uppercase px-1.5 py-0.5 rounded border border-current font-bold opacity-80 shrink-0">
+                          {step.status}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              </div>
+              )}
 
-              {/* Realigned Grounded Conclusion */}
-              <div className="p-2.5 rounded-xl bg-cyan-950/40 border border-cyan-800/70 text-xs font-mono">
-                <div className="text-cyan-300 font-semibold flex items-center gap-1.5 mb-1">
-                  <CheckCircle2 className="w-3.5 h-3.5 text-cyan-400" />
-                  Grounded First-Principles Realignment:
+              {/* Realigned Conclusion */}
+              {auditResult.realignedConclusion && (
+                <div className="p-2.5 rounded-xl bg-emerald-950/40 border border-emerald-700/60 flex items-start gap-2.5">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+                  <div>
+                    <div className="text-[10px] font-mono text-emerald-400 uppercase font-semibold">
+                      Grounded First-Principles Realignment
+                    </div>
+                    <div className="text-xs font-mono text-slate-200 mt-0.5">
+                      {auditResult.realignedConclusion}
+                    </div>
+                  </div>
                 </div>
-                <p className="text-slate-200 text-[11px] leading-relaxed">
-                  {auditResult.realignedConclusion}
-                </p>
-              </div>
+              )}
             </div>
           ) : (
-            <div className="h-full flex flex-col items-center justify-center p-6 text-center">
-              <Compass className="w-10 h-10 text-cyan-500/40 mb-2" />
-              <div className="text-xs font-mono font-medium text-slate-300">
-                Diagnostic Traceback Standing By
+            <div className="h-full flex flex-col items-center justify-center text-center p-6 text-slate-500 my-auto">
+              <Compass className="w-8 h-8 text-slate-700 mb-2 animate-pulse" />
+              <div className="text-xs font-mono font-semibold text-slate-400">
+                Awaiting Trace-Back Diagnostic Execution
               </div>
-              <p className="text-[11px] font-mono text-slate-500 max-w-xs mt-1">
-                Configure your foundational axiom and ingested exposure vector, then click &ldquo;Execute Trace-Back Diagnostic Loop&rdquo;.
-              </p>
+              <div className="text-[10px] font-mono text-slate-600 mt-1 max-w-xs">
+                Configure Foundational Axiom, ingest external exposures, and click "Execute
+                Trace-Back Diagnostic Loop" to compute logical divergence.
+              </div>
             </div>
           )}
         </div>

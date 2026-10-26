@@ -306,12 +306,46 @@ export function createAxiomCore(shadowTexture: THREE.CanvasTexture): AxiomCoreGr
   return group;
 }
 
-// 2. Procedural 5-Part Regional Shard Node
+// Procedural Thermal Heatmap Dissipation Texture
+export function createThermalHeatmapTexture(isOverheated: boolean = false): THREE.CanvasTexture {
+  const canvas = document.createElement('canvas');
+  canvas.width = 256;
+  canvas.height = 256;
+  const ctx = canvas.getContext('2d')!;
+
+  const gradient = ctx.createRadialGradient(128, 128, 0, 128, 128, 124);
+  if (isOverheated) {
+    gradient.addColorStop(0, 'rgba(239, 68, 68, 0.85)');
+    gradient.addColorStop(0.35, 'rgba(245, 158, 11, 0.55)');
+    gradient.addColorStop(0.75, 'rgba(220, 38, 38, 0.20)');
+    gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
+  } else {
+    gradient.addColorStop(0, 'rgba(16, 185, 129, 0.70)');
+    gradient.addColorStop(0.4, 'rgba(56, 189, 248, 0.40)');
+    gradient.addColorStop(0.75, 'rgba(6, 78, 59, 0.15)');
+    gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
+  }
+
+  ctx.fillStyle = gradient;
+  ctx.fillRect(0, 0, 256, 256);
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  return texture;
+}
+
+// 2. Procedural 5-Part Regional Shard Node + Thermal Ground Plane
 export interface ShardGroup extends THREE.Group {
   shardData: ShardNodeData;
-  updateAnimation: (dt: number, isSelected: boolean) => void;
+  updateAnimation: (
+    dt: number,
+    isSelected: boolean,
+    showHeatmap?: boolean,
+    thermalMode?: string
+  ) => void;
   vaultMesh: THREE.Mesh;
   haloRing: THREE.Mesh;
+  thermalMesh: THREE.Mesh;
 }
 
 export function createRegionalShard(
@@ -389,7 +423,7 @@ export function createRegionalShard(
   group.add(halo);
   group.haloRing = halo;
 
-  // Contact Shadow Plane beneath shard
+  // 6. Contact Shadow Plane beneath shard
   const shadowGeo = new THREE.PlaneGeometry(4.5, 4.5);
   const shadowMat = new THREE.MeshBasicMaterial({
     map: shadowTexture,
@@ -402,9 +436,65 @@ export function createRegionalShard(
   shadowPlane.position.y = 0.02;
   group.add(shadowPlane);
 
-  group.updateAnimation = (dt: number, isSelected: boolean) => {
+  // 7. Interactive Topographical Thermal Dissipation Heatmap Ring
+  const thermalTex = createThermalHeatmapTexture(false);
+  const thermalGeo = new THREE.PlaneGeometry(9, 9);
+  const thermalMat = new THREE.MeshBasicMaterial({
+    map: thermalTex,
+    transparent: true,
+    opacity: 0.0,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+  });
+  const thermalMesh = new THREE.Mesh(thermalGeo, thermalMat);
+  thermalMesh.rotation.x = -Math.PI / 2;
+  thermalMesh.position.y = 0.03;
+  group.add(thermalMesh);
+  group.thermalMesh = thermalMesh;
+
+  let thermalPulse = 0;
+
+  group.updateAnimation = (
+    dt: number,
+    isSelected: boolean,
+    showHeatmap: boolean = false,
+    thermalMode: string = 'sharded-optimal'
+  ) => {
     halo.rotation.z += 1.5 * dt;
     halo.scale.setScalar(isSelected ? 1.25 : 1.0);
+
+    // Dynamic Topographical Thermal Heatmap Animation
+    if (showHeatmap) {
+      thermalPulse += dt * 2.0;
+      const isBottleneck = thermalMode === 'centralized-bottleneck';
+      const isCurtailment = thermalMode === 'grid-curtailment';
+
+      const baseScale = isBottleneck ? 1.8 : isCurtailment ? 1.4 : 1.0;
+      const pulseMod = Math.sin(thermalPulse) * 0.08;
+      thermalMesh.scale.setScalar(baseScale + pulseMod);
+
+      const targetOpacity = isBottleneck ? 0.85 : 0.55;
+      (thermalMesh.material as THREE.MeshBasicMaterial).opacity = THREE.MathUtils.lerp(
+        (thermalMesh.material as THREE.MeshBasicMaterial).opacity,
+        targetOpacity,
+        0.1
+      );
+
+      if (isBottleneck) {
+        (thermalMesh.material as THREE.MeshBasicMaterial).color.setHex(0xef4444);
+      } else if (isCurtailment) {
+        (thermalMesh.material as THREE.MeshBasicMaterial).color.setHex(0xf59e0b);
+      } else {
+        (thermalMesh.material as THREE.MeshBasicMaterial).color.setHex(0x10b981);
+      }
+    } else {
+      (thermalMesh.material as THREE.MeshBasicMaterial).opacity = THREE.MathUtils.lerp(
+        (thermalMesh.material as THREE.MeshBasicMaterial).opacity,
+        0,
+        0.15
+      );
+    }
+
     // Tint based on alert or normal
     if (data.vaultStatus === 'divergence_alert') {
       (halo.material as THREE.MeshStandardMaterial).color.setHex(0xef4444);
